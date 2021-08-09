@@ -7,4 +7,14 @@ Git의 장점
 3. 체계적 개발 가능 - 패치에 대한 수정 내용을 단계적으로 확인 가능
 
 사용법
+- commit
+1. Visual Studio Code를 통해 코드를 입력한다.
+2. 파일을 저장한다: ctrl+s
+3. github desktop을 통해 commit한다.
+4. push 하고자 하는 브랜치를 설정한다.
+5. push 버튼을 통해 깃 허브 서버에 올린다.
 
+- 수정내용 확인
+1. github desktop에서 새로고침을 진행한다.
+2. pull 할 내용이 있는지 확인(repository가 업데이트 될 때 pull 버튼이 뜬다.)
+3. pull 버튼을 눌러 내 pc 폴더를 업데이트 한다.
