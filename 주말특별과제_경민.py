@@ -212,6 +212,6 @@ plt.pie(ratio, labels=labels, autopct='%0.1d%%', wedgeprops=wedgeprops)
 
 # In[ ]:
 
-
+#수정 1
 
 
