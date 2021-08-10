@@ -209,17 +209,3 @@ plt.pie(ratio, labels=labels, autopct='%0.1d%%', wedgeprops=wedgeprops)
 
 
 # #### 완벽하게 분류할 수 없어서 가능한 곳 까지
-
-# In[ ]:
-
-#수정 1
-#수정 2
-#수정 3
-#경민이형 저 담배피고 올게여
-#sunny 교육 중
-
-#sanha
-xptmxm 2
-tset
-test test test
-xptmxm
