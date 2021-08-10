@@ -218,3 +218,4 @@ plt.pie(ratio, labels=labels, autopct='%0.1d%%', wedgeprops=wedgeprops)
 #경민이형 저 담배피고 올게여
 #sunny 교육 중
 
+#sanha
