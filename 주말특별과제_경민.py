@@ -220,3 +220,6 @@ plt.pie(ratio, labels=labels, autopct='%0.1d%%', wedgeprops=wedgeprops)
 
 #sanha
 xptmxm 2
+tset
+test test test
+xptmxm
