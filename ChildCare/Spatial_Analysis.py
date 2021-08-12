@@ -46,9 +46,10 @@ def save_fig(save_dir, figure, title=None, close_fig=True):
     os.chdir(dir_org)
    
     
-def get_all_attr(price):
+def get_all_attr(price, min_th_dist=1.1):
+    from eda import load_map_rest_join
     gdf_base1, gdf_base2 = load_map_rest_join(pri_thld=price)
-    gdf_set = GdfCompare(gdf_base1, gdf_base2)
+    gdf_set = GdfCompare(gdf_base1, gdf_base2, min_th_dist=min_th_dist)
     gdf_set.run_local_g()
     gdf_set.run_stats_diff()
     gdf_set.run_global_moran()
@@ -66,6 +67,8 @@ class GdfCompare:
         self.min_thld_distance = min_th_dist
         
     def run_stats_diff(self):
+        from scipy.stats import shapiro, ttest_rel
+        
         sw_jj_frchs = shapiro(self.gdf_before.mean_rest)
         sw_jj = shapiro(self.gdf_after.mean_rest)
         
@@ -109,6 +112,8 @@ class GdfCompare:
     
     
     def run_local_g(self):
+        import libpysal
+        
         # Get Getis Ord Local
         cent_jj = self.gdf_before.geometry.centroid
         xys = pd.DataFrame({'X': cent_jj.x, 'Y': cent_jj.y})
@@ -124,11 +129,11 @@ class GdfCompare:
                                       wt_jj, transform='r')
         self.lg_gdf_after = lg_gdf_after
         
-        self.gdf_before['lg_p_sim'] = lg_jj_frchs.p_sim
-        self.gdf_before['lg_Zs'] = lg_jj_frchs.Zs
+        self.gdf_before['lg_p_sim'] = lg_gdf_before.p_sim
+        self.gdf_before['lg_Zs'] = lg_gdf_before.Zs
         
-        self.gdf_after['lg_p_sim'] = lg_jj.p_sim
-        self.gdf_after['lg_Zs'] = lg_jj.Zs
+        self.gdf_after['lg_p_sim'] = lg_gdf_after.p_sim
+        self.gdf_after['lg_Zs'] = lg_gdf_after.Zs
         
         # Classify the hotspot classes 
         self.gdf_before['hotspot_class'] = np.nan
@@ -145,10 +150,10 @@ class GdfCompare:
         sig_gdf_after = self.gdf_after.lg_p_sim < 0.05
         
         self.gdf_after.loc[sig_gdf_after==False, 'hotspot_class'] = 0
-        self.gdf_after.loc[(sig_jj==True) & 
+        self.gdf_after.loc[(sig_gdf_after==True) & 
                            (self.gdf_after.lg_Zs > 0), 
                            'hotspot_class'] = 1
-        self.gdf_after.loc[(sig_jj==True) & 
+        self.gdf_after.loc[(sig_gdf_after==True) & 
                            (self.gdf_after.lg_Zs < 0), 
                            'hotspot_class'] = -1
             
