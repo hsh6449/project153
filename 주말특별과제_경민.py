@@ -219,7 +219,4 @@ plt.pie(ratio, labels=labels, autopct='%0.1d%%', wedgeprops=wedgeprops)
 #sunny 교육 중
 
 #sanha
-xptmxm 2
-tset
-test test test
-xptmxm
+test2
