@@ -52,19 +52,18 @@ def get_all_attr(price):
     gdf_set.run_local_g()
     gdf_set.run_stats_diff()
     gdf_set.run_global_moran()
-    gdf_set.plot_compare()
     
     return gdf_set
     
 #%% Custom classes
 class GdfCompare:
-    def __init__(self, gdf1, gdf2):
+    def __init__(self, gdf1, gdf2, min_th_dist=100):
         self.gdf_before = gdf1
         self.gdf_after = gdf2
         self.alternative = 'less'
         self.t_test = False
         self.wrst = False
-        
+        self.min_thld_distance = min_th_dist
         
     def run_stats_diff(self):
         sw_jj_frchs = shapiro(self.gdf_before.mean_rest)
@@ -113,7 +112,8 @@ class GdfCompare:
         # Get Getis Ord Local
         cent_jj = self.gdf_before.geometry.centroid
         xys = pd.DataFrame({'X': cent_jj.x, 'Y': cent_jj.y})
-        min_wt_jj_thld = libpysal.weights.util.min_threshold_distance(xys)*1.1
+        min_wt_jj_thld = libpysal.weights.util.min_threshold_distance(xys)\
+            *self.min_thld_distance
         wt_jj = libpysal.weights.DistanceBand(xys, threshold=min_wt_jj_thld)
         
         lg_gdf_before = esda.getisord.G_Local(self.gdf_before.mean_rest, 
@@ -134,8 +134,7 @@ class GdfCompare:
         self.gdf_before['hotspot_class'] = np.nan
         sig_gdf_before = self.gdf_before.lg_p_sim < 0.05
         
-        self.gdf_before.loc[self.gdf_before[sig_gdf_before==False],
-                            'hotspot_class'] = 0
+        self.gdf_before.loc[sig_gdf_before==False, 'hotspot_class'] = 0
         self.gdf_before.loc[(sig_gdf_before==True) & 
                             (self.gdf_before.lg_Zs > 0), 
                             'hotspot_class'] = 1
@@ -145,8 +144,7 @@ class GdfCompare:
         
         sig_gdf_after = self.gdf_after.lg_p_sim < 0.05
         
-        self.gdf_after.loc[self.gdf_after[sig_gdf_after==False], 
-                           'hotspot_class'] = 0
+        self.gdf_after.loc[sig_gdf_after==False, 'hotspot_class'] = 0
         self.gdf_after.loc[(sig_jj==True) & 
                            (self.gdf_after.lg_Zs > 0), 
                            'hotspot_class'] = 1
@@ -168,6 +166,8 @@ class GdfCompare:
                                        (self.gdf_before.lg_Zs < 0)].plot(
            ax=ax[0], color='blue', edgecolor='k', linewidth=0.1)                                        
         ax[0].axis(False)
+        
+        # self.gdf_before[self.gdf_before.hotspot_class==]
         
         sig_gdf_after = self.gdf_after.lg_p_sim < 0.05
         ns_jj = self.gdf_after[sig_jj==False].plot(
@@ -342,7 +342,9 @@ if __name__ == '__main__':
     
     print(baseline.glo_m_before, baseline.glo_m_after)
 
-    # for price in np.arange(6000, 7000, 100):
+    for price in tqdm(np.arange(6000, 7000, 100),
+                      desc='price variation test'):
+        pass
         
     #%% Export by pickle
     gdf_6000 = get_all_attr(price=6000)
@@ -353,10 +355,10 @@ if __name__ == '__main__':
         pickle.dump(gdf_7000, f)
         
     import pickle
-    with open ('wsrt_result_total_less', 'rb') as f:
-        wsrt_rslt_tot_less = pickle.load(f)
-    with open ('wsrt_result_total_less', 'rb') as f:
-        wsrt_rslt_tot_less = pickle.load(f)
-        
+    with open ('gdf_6000_won', 'rb') as f:
+        a = pickle.load(f)
+    with open ('gdf_7000_won', 'rb') as f:
+        b = pickle.load(f)
+
     
     

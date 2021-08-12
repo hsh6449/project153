@@ -141,10 +141,8 @@ def load_map_rest_join(pri_thld=6000):
     for idx, row in tqdm(df_rest_jj_frchs.iterrows(),
                          total=len(df_rest_jj_frchs.index),
                          desc='Merging Menu and Price'):
-        str_sims = []
         nm_org = df_rest_jj_frchs.at[idx, 'm_name']
-        for i, r in df_rest_jj.iterrows():
-            str_sims.append(str_sim(nm_org, r.res_name))
+        str_sims = df_rest_jj.res_name.apply(lambda x : str_sim('롯데리아', x))
         
         best_sim = np.max(str_sims)
         best_sim_idx = np.argmax(str_sims)
@@ -448,10 +446,8 @@ if __name__ == '__main__':
     
     for idx, row in tqdm(df_rest_jj_frchs.iterrows(),
                          total=len(df_rest_jj_frchs.index)):
-        str_sims = []
         nm_org = df_rest_jj_frchs.at[idx, 'm_name']
-        for i, r in df_rest_jj.iterrows():
-            str_sims.append(str_sim(nm_org, r.res_name))
+        str_sims = df_rest_jj.res_name.apply(lambda x : str_sim('롯데리아', x))
         
         best_sim = np.max(str_sims)
         best_sim_idx = np.argmax(str_sims)
