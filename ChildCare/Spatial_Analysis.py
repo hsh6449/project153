@@ -46,9 +46,21 @@ def save_fig(save_dir, figure, title=None, close_fig=True):
     os.chdir(dir_org)
    
     
-def get_all_attr(price, min_th_dist=1.1):
+def get_all_attr(price, price2=None, min_th_dist=1.1, mode='policy'):
     from eda import load_map_rest_join
-    gdf_base1, gdf_base2 = load_map_rest_join(pri_thld=price)
+    
+    if mode == 'policy':
+        gdf_base1, gdf_base2 = load_map_rest_join(pri_thld=price)
+    elif mode == 'before':
+        gdf_base1, _ = load_map_rest_join(pri_thld=price)
+        gdf_base2, _ = load_map_rest_join(pri_thld=price2)
+    elif mode == 'after':
+        _, gdf_base1 = load_map_rest_join(pri_thld=price)
+        _, gdf_base2 = load_map_rest_join(pri_thld=price2)
+    else:
+        print("mode should be policy or before or after")
+        raise NotImplementedError
+    
     gdf_set = GdfCompare(gdf_base1, gdf_base2, min_th_dist=min_th_dist)
     gdf_set.run_local_g()
     gdf_set.run_stats_diff()
@@ -347,23 +359,35 @@ if __name__ == '__main__':
     
     print(baseline.glo_m_before, baseline.glo_m_after)
 
-    for price in tqdm(np.arange(6000, 7000, 100),
+    #%% price increasing test under condition prior to policy application
+    pri_inc_wo_plcy = []
+    for price in tqdm(np.arange(6000, 10500, 500),
                       desc='price variation test'):
-        pass
+        pri_inc_wo_plcy.append(
+            get_all_attr(6000, price, mode='before')
+            )
         
-    #%% Export by pickle
-    gdf_6000 = get_all_attr(price=6000)
-    gdf_7000 = get_all_attr(price=7000)
-    with open ('gdf_6000_won', 'wb') as f:
-        pickle.dump(gdf_6000, f)
-    with open ('gdf_7000_won', 'wb') as f:
-        pickle.dump(gdf_7000, f)
+    pvals_before = [x.t_test_pval for x in pri_inc_wo_plcy]
+    
+    mean_rests_before = [x.gdf_after.sum_rest.sum() for x in pri_inc_wo_plcy]
+    
+    #%% price increasing test under condition posterior policy application
+    pri_inc_w_plcy = []
+    for price in tqdm(np.arange(6000, 10500, 500),
+                      desc='price variation test'):
+        pri_inc_w_plcy.append(
+            get_all_attr(6000, price, mode='before')
+            )
         
-    import pickle
-    with open ('gdf_6000_won', 'rb') as f:
-        a = pickle.load(f)
-    with open ('gdf_7000_won', 'rb') as f:
-        b = pickle.load(f)
+    pvals_after = [x.t_test_pval for x in pri_inc_w_plcy]
+    
+    mean_rests_after = [x.gdf_after.sum_rest.sum() for x in pri_inc_w_plcy]
+        
+    #%%
+    test = get_all_attr(6000, 6200, mode='after')
+    a = pd.DataFrame(data={'before':test.gdf_before.mean_rest,
+                           'after':test.gdf_after.mean_rest})
+    print(test.t_test_pval, test.wrst)
 
     
     
