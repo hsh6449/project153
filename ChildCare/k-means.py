@@ -214,7 +214,7 @@ six_merge_result2 = six_af_merge.groupby(['target', 'cluster'])['sum_school'].co
 
 
 six_bf_score = silhouette_score(six_bf_merge, kmeans.labels_,metric='euclidean')
-six_af_score = silhouette_score(six_af_merge, kmeans.labels_,metric='euclidean')
+six_af_score = silhouette_score(six_af_merge, kmeans_2.labels_,metric='euclidean')
 
 print(six_merge_result)
 print(six_merge_result2)
@@ -291,9 +291,9 @@ sev_af_merge = merge_2[['sum_rest', 'sum_school', 'mean_rest','공시지가']]
 sc.fit(sev_bf_merge)
 sc.fit(sev_af_merge)
 
-kmeans = KMeans(n_clusters=3, init = 'k-means++', max_iter= 300, random_state = 40).fit(sc.transform(sev_bf_merge))
+kmeans_3 = KMeans(n_clusters=3, init = 'k-means++', max_iter= 300, random_state = 40).fit(sc.transform(sev_bf_merge))
 sev_bf_merge['cluster'] = kmeans.labels_ 
-kmeans_2 = KMeans(n_clusters=3, init = 'k-means++', max_iter= 300, random_state = 40).fit(sc.transform(sev_af_merge))
+kmeans_4 = KMeans(n_clusters=3, init = 'k-means++', max_iter= 300, random_state = 40).fit(sc.transform(sev_af_merge))
 sev_af_merge['cluster'] = kmeans_2.labels_ 
 
 sev_bf_merge['target'] = sev_bf.hotspot_class
@@ -302,8 +302,8 @@ sev_af_merge['target'] = sev_af.hotspot_class
 sev_merge_result2 = sev_af_merge.groupby(['target', 'cluster'])['mean_rest'].count()
 
 
-sev_bf_score = silhouette_score(sev_bf_merge, kmeans.labels_,metric='euclidean')
-sev_af_score = silhouette_score(sev_af_merge, kmeans.labels_,metric='euclidean')
+sev_bf_score = silhouette_score(sev_bf_merge, kmeans_3.labels_,metric='euclidean')
+sev_af_score = silhouette_score(sev_af_merge, kmeans_4.labels_,metric='euclidean')
 
 print(sev_merge_result)
 print(sev_merge_result2)
@@ -328,7 +328,7 @@ plt.scatter(x = sev_bf_merge.loc[marker2_ind, 'pca_x'], y = sev_bf_merge.loc[mar
 plt.legend()
 plt.xlabel('PCA 1')
 plt.ylabel('PCA 2')
-plt.title('Clusters Visualization')
+plt.title('7000 Befoe policy Clusters Visualization')
 plt.show()
 
 print('공시지가 cor :',stats.pointbiserialr(x = sev_bf_merge['공시지가'], y = sev_bf_merge['cluster']))
@@ -359,7 +359,7 @@ plt.scatter(x = sev_af_merge.loc[marker2_ind, 'pca_x'], y = sev_af_merge.loc[mar
 plt.legend()
 plt.xlabel('PCA 1')
 plt.ylabel('PCA 2')
-plt.title('Clusters Visualization')
+plt.title('7000 After policy Clusters Visualization')
 plt.show()
 
 print('공시지가 cor :',stats.pointbiserialr(x = sev_af_merge['공시지가'], y = sev_af_merge['cluster']))
@@ -394,7 +394,7 @@ plt.legend()
 plt.text(3, 30, sm/total)
 plt.xlabel('PCA 1')
 plt.ylabel('PCA 2')
-plt.title('Clusters Visualization')
+plt.title('6000 Befoe policy same/diff Clusters Visualization')
 plt.show()
 #%%
 six_af_merge['target'].loc[six_af_merge['target'] == 1] = 2
@@ -420,7 +420,7 @@ plt.text(3, 30, sm/total)
 plt.legend()
 plt.xlabel('PCA 1')
 plt.ylabel('PCA 2')
-plt.title('Clusters Visualization')
+plt.title('6000 After policy same/diff Clusters Visualization')
 plt.show()
 #%%
 sev_bf_merge['target'].loc[sev_bf_merge['target'] == 1] = 2
@@ -445,7 +445,7 @@ plt.text(3, 30, sm/total)
 plt.legend()
 plt.xlabel('PCA 1')
 plt.ylabel('PCA 2')
-plt.title('Clusters Visualization')
+plt.title('7000 Before policy same/diff Clusters Visualization')
 plt.show()
 #%%
 sev_af_merge['target'].loc[sev_af_merge['target'] == 1] = 2
@@ -470,7 +470,7 @@ plt.text(3, 30, sm/total)
 plt.legend()
 plt.xlabel('PCA 1')
 plt.ylabel('PCA 2')
-plt.title('Clusters Visualization')
+plt.title('7000 After policy same/diff Clusters Visualization')
 plt.show()
 
 #%% 공시지가 없는 모델 시각화
@@ -500,24 +500,25 @@ plt.show()
 sev_bf_merge['target'].loc[sev_bf_merge['target'] == 1] = 2
 sev_bf_merge['target'].loc[sev_bf_merge['target'] == 0] = 1
 sev_bf_merge['target'].loc[sev_bf_merge['target'] == int(-1)] = 0
+#%%
+from sklearn.metrics import silhouette_samples
 
+silhouette_samples(six_bf_merge, kmeans.labels_,metric='euclidean')
 
-
-pca = PCA(n_components=2)
-pca_transformed = pca.fit_transform(sev_bf_merge[['sum_rest','sum_school', 'mean_rest','공시지가']])
-
-sev_bf_merge['pca_x'] = pca_transformed[:,0]
-sev_bf_merge['pca_y'] = pca_transformed[:,1] 
-
-diffidx = sev_bf_merge[sev_bf_merge['cluster'] != sev_bf_merge['target']].index
-sameidx = sev_bf_merge[sev_bf_merge['cluster'] == sev_bf_merge['target']].index
-
-plt.scatter(x = sev_bf_merge.loc[sameidx, 'pca_x'], y = six_bf_merge.loc[sameidx, 'pca_y'], marker = 'o', label= 'same')
-plt.scatter(x = sev_bf_merge.loc[diffidx, 'pca_x'], y = six_bf_merge.loc[diffidx, 'pca_y'], marker = 's', label= 'Different')
-\
-
-plt.legend()
-plt.xlabel('PCA 1')
-plt.ylabel('PCA 2')
-plt.title('Clusters Visualization')
-plt.show()
+f, axes = plt.subplots(1, 5, sharex=True, sharey=True)
+f.set_size_inches(15, 3)
+for i, ax in enumerate(axes):
+    sil_samples = silhouette_samples(six_bf_merge, kmeans.labels_,metric='euclidean')
+    sil_score = silhouette_score(six_bf_merge, kmeans.labels_,metric='euclidean')
+    ax.plot(sorted(sil_samples), color='red',linestyle='dashed', linewidth=2)
+    ax.set_title("silhouette_score: {}".format(round(sil_score, 2)))
+    
+#%%
+f, axes = plt.subplots(1, 5, sharex=True, sharey=True)
+f.set_size_inches(15, 3)
+for i, ax in enumerate(axes):
+    sil_samples = silhouette_samples(sev_bf_merge, kmeans_3.labels_,metric='euclidean')
+    sil_score = silhouette_score(sev_bf_merge, kmeans_3.labels_,metric='euclidean')
+    ax.plot(sorted(sil_samples), color='red',linestyle='dashed', linewidth=2)
+    ax.set_title("silhouette_score: {}".format(round(sil_score, 2)))
+#%%
