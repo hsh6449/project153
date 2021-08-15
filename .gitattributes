@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+fulldata_07_24_03_P_일반음식점.csv filter=lfs diff=lfs merge=lfs -text
+/user/users/공공빅데이터 filter=lfs diff=lfs merge=lfs -text
+청년인턴십/프로젝트/fulldata_07_24_04_P_일반음식점.csv filter=lfs diff=lfs merge=lfs -text
