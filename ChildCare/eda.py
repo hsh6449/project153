@@ -138,13 +138,9 @@ def load_map_rest_join(pri_thld=6000):
     #% Join the price column of df_rest_jj to franchise based on str simility
     df_rest_jj_frchs[['price', 'menu', 'name']] = np.nan
     
-    for idx, row in tqdm(df_rest_jj_frchs.iterrows(),
-                         total=len(df_rest_jj_frchs.index),
-                         desc='Merging Menu and Price'):
-        str_sims = []
+    for idx, row in df_rest_jj_frchs.iterrows():
         nm_org = df_rest_jj_frchs.at[idx, 'm_name']
-        for i, r in df_rest_jj.iterrows():
-            str_sims.append(str_sim(nm_org, r.res_name))
+        str_sims = df_rest_jj.res_name.apply(lambda x : str_sim(nm_org, x))
         
         best_sim = np.max(str_sims)
         best_sim_idx = np.argmax(str_sims)
@@ -177,6 +173,10 @@ def load_map_rest_join(pri_thld=6000):
             'menu'] = menu
     
     df_rest_jj_frchs = df_rest_jj_frchs.dropna(subset=['price'])
+    
+    # Remove convenience store
+    df_rest_jj_frchs = \
+        df_rest_jj_frchs[~df_rest_jj_frchs.m_name.str.contains('CU')]
     
     # Select map data of Jeonju and copy it for franchies restaurants
     gdf_emd_jj = deepcopy(gdf_emd)
@@ -448,10 +448,8 @@ if __name__ == '__main__':
     
     for idx, row in tqdm(df_rest_jj_frchs.iterrows(),
                          total=len(df_rest_jj_frchs.index)):
-        str_sims = []
         nm_org = df_rest_jj_frchs.at[idx, 'm_name']
-        for i, r in df_rest_jj.iterrows():
-            str_sims.append(str_sim(nm_org, r.res_name))
+        str_sims = df_rest_jj.res_name.apply(lambda x : str_sim('롯데리아', x))
         
         best_sim = np.max(str_sims)
         best_sim_idx = np.argmax(str_sims)
@@ -495,6 +493,10 @@ if __name__ == '__main__':
                                     ['m_name', 'name', 'menu', 'price']]
     
     df_rest_jj_frchs = df_rest_jj_frchs.dropna(subset=['price'])
+    
+    # Remove convenience store
+    df_rest_jj_frchs = \
+        df_rest_jj_frchs[~df_rest_jj_frchs.m_name.str.contains('CU')]
     
     #%% Select map data of Jeonju and copy it for franchies restaurants
     gdf_emd_jj = deepcopy(gdf_emd)

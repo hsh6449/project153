@@ -46,27 +46,41 @@ def save_fig(save_dir, figure, title=None, close_fig=True):
     os.chdir(dir_org)
    
     
-def get_all_attr(price):
-    gdf_base1, gdf_base2 = load_map_rest_join(pri_thld=price)
-    gdf_set = GdfCompare(gdf_base1, gdf_base2)
+def get_all_attr(price, price2=None, min_th_dist=1.1, mode='policy'):
+    from eda import load_map_rest_join
+    
+    if mode == 'policy':
+        gdf_base1, gdf_base2 = load_map_rest_join(pri_thld=price)
+    elif mode == 'before':
+        gdf_base1, _ = load_map_rest_join(pri_thld=price)
+        gdf_base2, _ = load_map_rest_join(pri_thld=price2)
+    elif mode == 'after':
+        _, gdf_base1 = load_map_rest_join(pri_thld=price)
+        _, gdf_base2 = load_map_rest_join(pri_thld=price2)
+    else:
+        print("mode should be policy or before or after")
+        raise NotImplementedError
+    
+    gdf_set = GdfCompare(gdf_base1, gdf_base2, min_th_dist=min_th_dist)
     gdf_set.run_local_g()
     gdf_set.run_stats_diff()
     gdf_set.run_global_moran()
-    gdf_set.plot_compare()
     
     return gdf_set
     
 #%% Custom classes
 class GdfCompare:
-    def __init__(self, gdf1, gdf2):
+    def __init__(self, gdf1, gdf2, min_th_dist=100):
         self.gdf_before = gdf1
         self.gdf_after = gdf2
         self.alternative = 'less'
         self.t_test = False
         self.wrst = False
-        
+        self.min_thld_distance = min_th_dist
         
     def run_stats_diff(self):
+        from scipy.stats import shapiro, ttest_rel
+        
         sw_jj_frchs = shapiro(self.gdf_before.mean_rest)
         sw_jj = shapiro(self.gdf_after.mean_rest)
         
@@ -110,10 +124,13 @@ class GdfCompare:
     
     
     def run_local_g(self):
+        import libpysal
+        
         # Get Getis Ord Local
         cent_jj = self.gdf_before.geometry.centroid
         xys = pd.DataFrame({'X': cent_jj.x, 'Y': cent_jj.y})
-        min_wt_jj_thld = libpysal.weights.util.min_threshold_distance(xys)*1.1
+        min_wt_jj_thld = libpysal.weights.util.min_threshold_distance(xys)\
+            *self.min_thld_distance
         wt_jj = libpysal.weights.DistanceBand(xys, threshold=min_wt_jj_thld)
         
         lg_gdf_before = esda.getisord.G_Local(self.gdf_before.mean_rest, 
@@ -124,18 +141,17 @@ class GdfCompare:
                                       wt_jj, transform='r')
         self.lg_gdf_after = lg_gdf_after
         
-        self.gdf_before['lg_p_sim'] = lg_jj_frchs.p_sim
-        self.gdf_before['lg_Zs'] = lg_jj_frchs.Zs
+        self.gdf_before['lg_p_sim'] = lg_gdf_before.p_sim
+        self.gdf_before['lg_Zs'] = lg_gdf_before.Zs
         
-        self.gdf_after['lg_p_sim'] = lg_jj.p_sim
-        self.gdf_after['lg_Zs'] = lg_jj.Zs
+        self.gdf_after['lg_p_sim'] = lg_gdf_after.p_sim
+        self.gdf_after['lg_Zs'] = lg_gdf_after.Zs
         
         # Classify the hotspot classes 
         self.gdf_before['hotspot_class'] = np.nan
         sig_gdf_before = self.gdf_before.lg_p_sim < 0.05
         
-        self.gdf_before.loc[self.gdf_before[sig_gdf_before==False],
-                            'hotspot_class'] = 0
+        self.gdf_before.loc[sig_gdf_before==False, 'hotspot_class'] = 0
         self.gdf_before.loc[(sig_gdf_before==True) & 
                             (self.gdf_before.lg_Zs > 0), 
                             'hotspot_class'] = 1
@@ -145,12 +161,11 @@ class GdfCompare:
         
         sig_gdf_after = self.gdf_after.lg_p_sim < 0.05
         
-        self.gdf_after.loc[self.gdf_after[sig_gdf_after==False], 
-                           'hotspot_class'] = 0
-        self.gdf_after.loc[(sig_jj==True) & 
+        self.gdf_after.loc[sig_gdf_after==False, 'hotspot_class'] = 0
+        self.gdf_after.loc[(sig_gdf_after==True) & 
                            (self.gdf_after.lg_Zs > 0), 
                            'hotspot_class'] = 1
-        self.gdf_after.loc[(sig_jj==True) & 
+        self.gdf_after.loc[(sig_gdf_after==True) & 
                            (self.gdf_after.lg_Zs < 0), 
                            'hotspot_class'] = -1
             
@@ -168,6 +183,8 @@ class GdfCompare:
                                        (self.gdf_before.lg_Zs < 0)].plot(
            ax=ax[0], color='blue', edgecolor='k', linewidth=0.1)                                        
         ax[0].axis(False)
+        
+        # self.gdf_before[self.gdf_before.hotspot_class==]
         
         sig_gdf_after = self.gdf_after.lg_p_sim < 0.05
         ns_jj = self.gdf_after[sig_jj==False].plot(
@@ -342,21 +359,35 @@ if __name__ == '__main__':
     
     print(baseline.glo_m_before, baseline.glo_m_after)
 
-    # for price in np.arange(6000, 7000, 100):
+    #%% price increasing test under condition prior to policy application
+    pri_inc_wo_plcy = []
+    for price in tqdm(np.arange(6000, 10500, 500),
+                      desc='price variation test'):
+        pri_inc_wo_plcy.append(
+            get_all_attr(6000, price, mode='before')
+            )
         
-    #%% Export by pickle
-    gdf_6000 = get_all_attr(price=6000)
-    gdf_7000 = get_all_attr(price=7000)
-    with open ('gdf_6000_won', 'wb') as f:
-        pickle.dump(gdf_6000, f)
-    with open ('gdf_7000_won', 'wb') as f:
-        pickle.dump(gdf_7000, f)
+    pvals_before = [x.t_test_pval for x in pri_inc_wo_plcy]
+    
+    mean_rests_before = [x.gdf_after.sum_rest.sum() for x in pri_inc_wo_plcy]
+    
+    #%% price increasing test under condition posterior policy application
+    pri_inc_w_plcy = []
+    for price in tqdm(np.arange(6000, 10500, 500),
+                      desc='price variation test'):
+        pri_inc_w_plcy.append(
+            get_all_attr(6000, price, mode='before')
+            )
         
-    import pickle
-    with open ('wsrt_result_total_less', 'rb') as f:
-        wsrt_rslt_tot_less = pickle.load(f)
-    with open ('wsrt_result_total_less', 'rb') as f:
-        wsrt_rslt_tot_less = pickle.load(f)
+    pvals_after = [x.t_test_pval for x in pri_inc_w_plcy]
+    
+    mean_rests_after = [x.gdf_after.sum_rest.sum() for x in pri_inc_w_plcy]
         
+    #%%
+    test = get_all_attr(6000, 6200, mode='after')
+    a = pd.DataFrame(data={'before':test.gdf_before.mean_rest,
+                           'after':test.gdf_after.mean_rest})
+    print(test.t_test_pval, test.wrst)
+
     
     
