@@ -138,4 +138,12 @@ six_af_idx = six_af_merge[six_af_merge['cluster'] == 0 ].index
 vul_location_bf = merge.loc[six_bf_idx, 'ADM_DR_NM']
 vul_location_af = merge.loc[six_af_idx, 'ADM_DR_NM']
 
-(len(vul_location_bf) - len(vul_location_af)) /len(vul_location_bf) * 100
+(len(vul_location_bf) - len(vul_location_af)) /len(vul_location_bf) * 100 #취약지역 증감율
+
+six_bf_idx_2 = six_bf_merge[six_bf_merge['cluster'] == 2 ].index
+six_af_idx_2 = six_af_merge[six_af_merge['cluster'] == 2 ].index
+
+good_location_bf = merge.loc[six_bf_idx_2, 'ADM_DR_NM']
+good_location_af = merge.loc[six_af_idx_2, 'ADM_DR_NM']
+
+(len(good_location_af) - len(good_location_bf)) /len(good_location_bf) * 100 #좋은 지역 증감율
