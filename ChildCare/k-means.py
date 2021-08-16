@@ -65,7 +65,6 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from sklearn.metrics import silhouette_score ,silhouette_samples
-%matplotlib inline
 
 six_bf = a.gdf_before
 six_af = a.gdf_after
@@ -197,8 +196,8 @@ sc = StandardScaler()
 merge = pd.merge(six_bf, c.loc[:,['ADM_DR_NM','공시지가','초등학생수','중학생수','고등학생수']], how ='inner', on= 'ADM_DR_NM')
 merge_2 = pd.merge(six_af, c.loc[:,['ADM_DR_NM','공시지가','초등학생수','중학생수','고등학생수']], how ='inner', on= 'ADM_DR_NM')
 
-six_bf_merge = merge[['sum_rest', 'sum_school', 'mean_rest','공시지가']]
-six_af_merge = merge_2[['sum_rest', 'sum_school', 'mean_rest','공시지가']]
+six_bf_merge = merge[['sum_rest', 'sum_school','mean_rest','공시지가']]
+six_af_merge = merge_2[['sum_rest', 'sum_school','mean_rest', '공시지가']]
 sc.fit(six_bf_merge)
 sc.fit(six_af_merge)
 
@@ -223,7 +222,7 @@ print('6000 after silhouette score: %.3f' %six_af_score)
 
 #%% 시각화
 pca = PCA(n_components=2)
-pca_transformed = pca.fit_transform(six_bf_merge[['sum_rest', 'sum_school', 'mean_rest','공시지가']])
+pca_transformed = pca.fit_transform(six_bf_merge[['sum_rest','sum_school','mean_rest','공시지가']])
 
 six_bf_merge['pca_x'] = pca_transformed[:,0]
 six_bf_merge['pca_y'] = pca_transformed[:,1] 
@@ -282,11 +281,11 @@ print('식당 총 수 cor :',stats.pointbiserialr(x = six_af_merge['sum_rest'], 
 print('식당수 평균 cor :',stats.pointbiserialr(x = six_af_merge['mean_rest'], y = six_af_merge['target']))
 print('학교 총 수 cor :',stats.pointbiserialr(x = six_af_merge['sum_school'], y = six_af_merge['target']))
 #%%
-merge = pd.merge(sev_bf, c.loc[:,['ADM_DR_NM','공시지가','초등학생수','중학생수','고등학생수']], how ='inner', on= 'ADM_DR_NM')
-merge_2 = pd.merge(sev_af, c.loc[:,['ADM_DR_NM','공시지가','초등학생수','중학생수','고등학생수']], how ='inner', on= 'ADM_DR_NM')
+merge_3 = pd.merge(sev_bf, c.loc[:,['ADM_DR_NM','공시지가','초등학생수','중학생수','고등학생수']], how ='inner', on= 'ADM_DR_NM')
+merge_4 = pd.merge(sev_af, c.loc[:,['ADM_DR_NM','공시지가','초등학생수','중학생수','고등학생수']], how ='inner', on= 'ADM_DR_NM')
 
-sev_bf_merge = merge[['sum_rest', 'sum_school', 'mean_rest','공시지가']]
-sev_af_merge = merge_2[['sum_rest', 'sum_school', 'mean_rest','공시지가']]
+sev_bf_merge = merge_3[['sum_rest', 'sum_school', 'mean_rest','공시지가']]
+sev_af_merge = merge_4[['sum_rest', 'sum_school', 'mean_rest','공시지가']]
 
 sc.fit(sev_bf_merge)
 sc.fit(sev_af_merge)
@@ -359,7 +358,7 @@ plt.scatter(x = sev_af_merge.loc[marker2_ind, 'pca_x'], y = sev_af_merge.loc[mar
 plt.legend()
 plt.xlabel('PCA 1')
 plt.ylabel('PCA 2')
-plt.title('7000 After policy Clusters Visualization')
+plt.title('7000 After Policy Clusters Visualization')
 plt.show()
 
 print('공시지가 cor :',stats.pointbiserialr(x = sev_af_merge['공시지가'], y = sev_af_merge['cluster']))
@@ -522,3 +521,8 @@ for i, ax in enumerate(axes):
     ax.plot(sorted(sil_samples), color='red',linestyle='dashed', linewidth=2)
     ax.set_title("silhouette_score: {}".format(round(sil_score, 2)))
 #%%
+six_bf_idx = six_bf_merge[six_bf_merge['cluster'] == 0 ].index
+six_af_idx = six_af_merge[six_af_merge['cluster'] == 0 ].index
+
+vul_location_bf = merge.loc[six_bf_idx, 'ADM_DR_NM']
+vul_location_af = merge.loc[six_af_idx, 'ADM_DR_NM']
