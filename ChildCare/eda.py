@@ -320,9 +320,11 @@ if __name__ == '__main__':
     import math
     import pyproj
     import re
+    import matplotlib.patches as mpatches
     
     from tqdm import tqdm
     from matplotlib import pyplot as plt
+    from scipy.stats import shapiro
     from shapely.geometry import Polygon, LineString, Point
 
     tot_run_time_start = time.time()
@@ -360,7 +362,7 @@ if __name__ == '__main__':
     plt.rc('axes', titleweight='bold')
     plt.rc('xtick', labelsize=MEDIUM_SIZE)
     plt.rc('ytick', labelsize=MEDIUM_SIZE)
-    plt.rc('legend', fontsize=SMALL_SIZE)
+    plt.rc('legend', fontsize=MEDIUM_SIZE)
     plt.rc('figure', titlesize=LARGE_SIZE)
     
     # Save figure settings
@@ -449,7 +451,7 @@ if __name__ == '__main__':
     for idx, row in tqdm(df_rest_jj_frchs.iterrows(),
                          total=len(df_rest_jj_frchs.index)):
         nm_org = df_rest_jj_frchs.at[idx, 'm_name']
-        str_sims = df_rest_jj.res_name.apply(lambda x : str_sim('롯데리아', x))
+        str_sims = df_rest_jj.res_name.apply(lambda x : str_sim(nm_org, x))
         
         best_sim = np.max(str_sims)
         best_sim_idx = np.argmax(str_sims)
@@ -589,6 +591,26 @@ if __name__ == '__main__':
                 
         gdf_sch_jj_frchs.at[idx, 'num_rest'] = num_rest        
         
+    #%% Test - the number of franchise restaurants which is not near school
+    r_wo_sch = 0
+    r_nm = []
+    for i, r in tqdm(gdf_rest_jj_frchs.iterrows()):
+        rest = r.geometry
+        near = 0
+        for idx, row in gdf_sch_jj.iterrows():
+            sch_class = row.at['학교급구분']
+            geo_sch = row.geometry
+            dist = rest.distance(geo_sch)
+            if (sch_class == '초등학교') and (dist<1000):
+                near = 1
+            elif (sch_class == '중학교') and (dist<1000):
+                near = 1
+            elif (sch_class == '고등학교') and (dist<1000):
+                near = 1
+        if not near:
+            r_nm.append(r.m_name)
+        r_wo_sch += not(near)         
+                
     #%% Calculate total restaurants near school in terms of district
     gdf_emd_jj['sum_rest'] = np.zeros(len(gdf_emd_jj.index))
     gdf_emd_jj['sum_school']= np.zeros(len(gdf_emd_jj.index))
@@ -622,26 +644,156 @@ if __name__ == '__main__':
                 
     gdf_emd_jj_frchs['mean_rest'] = \
         gdf_emd_jj_frchs.sum_rest/gdf_emd_jj_frchs.sum_school
-       
+        
+    #%% sjoin test
+    def rest_jj_join(one_polygon):
+        """
+        Calculate the number of all restaurants in each polygon with out 
+        considering child behavior pattern
+        """
+        s = 0
+        for r in gdf_rest_jj.geometry:
+            if one_polygon.contains(r):
+                s += 1
+        
+        return s
+    
+    def rest_jj_frchs_join(one_polygon):
+        """
+        Calculate the number of all restaurants in each polygon with out 
+        considering child behavior pattern
+        """
+        s = 0
+        for r in gdf_rest_jj_frchs.geometry:
+            if one_polygon.contains(r):
+                s += 1
+        
+        return s
+    
+    gdf_emd_jj_frchs['num_rest'] = \
+        gdf_emd_jj_frchs.apply(lambda x: rest_jj_join(x['geometry']), axis=1)
+ 
     #%% Plot - Data geometry sync test
-    fig_test, ax_test = plt.subplots(1, 1, figsize=(12, 12))
+    fig_test, ax_test = plt.subplots(1, 1, figsize=(11, 8))
     
     # gdf.plot(ax=ax_test)
     gdf_emd_jj.plot(ax=ax_test, alpha=0.5,
-                    edgecolor='k', linewidth=2)
-    gdf_sch_jj.plot(column='num_rest', ax=ax_test, alpha=0.3, color='red',
-                    label='school')
-    gdf_rest_jj_frchs.plot(ax=ax_test, alpha=0.3, color='blue',
-                           label='franchise rest')
+                    edgecolor='k', linewidth=2, color='lightgrey')
+    gdf_sch_jj.plot(column='num_rest', ax=ax_test, alpha=0.5, color='red',
+                    label='school', markersize=50)
+    gdf_rest_jj_frchs.plot(ax=ax_test, alpha=0.7, color='blue',
+                            label='franchise rest')
     gdf_rest_jj.plot(ax=ax_test, alpha=0.3, color='orange', 
-                     label='total rest')
+                      label='total rest')
+    ax_test.axis(False)
     ax_test.legend()
+    
+    #%% Plot - Spatial distribution of each variables by Point plot
+    pt_dist_nms = ['학교', '가맹 음식점', '전체 음식점']
+    pt_dist_gdfs = [gdf_sch_jj, gdf_rest_jj_frchs, gdf_rest_jj]
+    pt_dist_colors = ['blue', 'red', 'tab:green']
+    pt_dist_titles = ['학교 점 공간분포', '가맹 음식점 점 공간분포',
+                      '전체 음식점 점 공간분포']
+    
+    fig_all, ax_all = plt.subplots(1, 1, figsize=(11, 8))
+    
+    gdf_emd_jj.plot(ax=ax_all, alpha=0.5,edgecolor='k', linewidth=2, 
+                color='lightgrey')
+    
+    for i in range(len(pt_dist_nms)):
+        fig, ax = plt.subplots(1, 1, figsize=(11, 8))
+        
+        gdf_emd_jj.plot(ax=ax, alpha=0.5,edgecolor='k', linewidth=2, 
+                        color='lightgrey')
+        gdf_sch_jj.plot(ax=ax, alpha=0.5, color='blue', label='학교',
+                        markersize=30)
+        
+        pt_gdf = pt_dist_gdfs[i]
+        pt_gdf.plot(ax=ax, alpha=0.5, color=pt_dist_colors[i],
+                    label=pt_dist_nms[i], markersize=30)        
+        pt_gdf = pt_dist_gdfs[i]
+        pt_gdf.plot(ax=ax_all, alpha=0.4, color=pt_dist_colors[i],
+                    label=pt_dist_nms[i], markersize=30)
+        
+        ax.legend()
+        ax.axis(False)
+        
+        save_fig(dir_nm_save_fig, fig, title=pt_dist_titles[i], 
+                 close_fig=True)
+        
+    ax_all.legend()        
+    ax_all.axis(False)
+    save_fig(dir_nm_save_fig, fig_all, title='모든 점 공간분포')
+    
+    #%% Plot - Distribution of menu data 
+    s_menu_jj = df_rest_menu.price
+    s_menu_jj = s_menu_jj[s_menu_jj <= 10000]
+    s_menu_jj[s_menu_jj < 6000] = 6000
+    
+    s_menu_jj_frchs = gdf_rest_jj_frchs.price
+    s_menu_jj_frchs = s_menu_jj_frchs[s_menu_jj_frchs <= 10000]
+    s_menu_jj_frchs[s_menu_jj_frchs < 6000] = 6000
+    
+    cust_tick_label = ['6000원 이하']
+    for i in np.arange(6500, 10500, 500):
+        cust_tick_label.append(str(i))
+
+    fig_menu_dist, ax_menu_dist = plt.subplots(1, 2, figsize=(18, 10))
+    
+    ax_menu_dist[0].hist(s_menu_jj_frchs, edgecolor='k', align='left', bins=9,
+                         rwidth=0.6, range=(6000, 10500))
+    ax_menu_dist[0].set_xticks(np.arange(6000, 10500, 500))
+    ax_menu_dist[0].set_xticklabels(cust_tick_label, rotation=60,
+                                    fontsize=1.5*MEDIUM_SIZE)
+    ax_menu_dist[0].set_xlabel('메뉴 가격', fontsize=1.5*LARGE_SIZE)
+    ax_menu_dist[0].set_ylabel('수', fontsize=1.5*LARGE_SIZE)
+    
+    ax_menu_dist[1].hist(s_menu_jj, edgecolor='k', align='left', bins=9,
+                         rwidth=0.5, range=(6000, 10500))
+    ax_menu_dist[1].set_xticks(np.arange(6000, 10500, 500))
+    ax_menu_dist[1].set_xticklabels(cust_tick_label, rotation=60,
+                                    fontsize=1.5*MEDIUM_SIZE)
+    ax_menu_dist[1].set_xlabel('메뉴 가격', fontsize=1.5*LARGE_SIZE)
+    ax_menu_dist[1].set_ylabel('수', fontsize=1.5*LARGE_SIZE)    
+    
+    fig_menu_dist.tight_layout()
+    
+    save_fig(dir_nm_save_fig, fig_menu_dist, title='메뉴 가격 분포',
+             close_fig=True)
+    
+    fig_menu_dist2, ax_menu_dist2 = plt.subplots(1, 1, figsize=(12, 8))
+    
+    ax_menu_dist2.hist(s_menu_jj, edgecolor='k', align='left', bins=9,
+                         rwidth=0.5, range=(6000, 10500))
+    ax_menu_dist2.set_xticks(np.arange(6000, 10500, 500))
+    ax_menu_dist2.set_xticklabels(cust_tick_label, rotation=60,
+                                    fontsize=1.5*MEDIUM_SIZE)
+    
+    ax_menu_dist2.hist(s_menu_jj_frchs, edgecolor='k', align='left', bins=9,
+                         rwidth=0.6, range=(6000, 10500))
+    ax_menu_dist2.set_xticks(np.arange(6000, 10500, 500))
+    ax_menu_dist2.set_xticklabels(cust_tick_label, rotation=60,
+                                    fontsize=1.5*MEDIUM_SIZE)
+    ax_menu_dist2.set_xlabel('메뉴 가격', fontsize=1.5*LARGE_SIZE)
+    ax_menu_dist2.set_ylabel('수', fontsize=1.5*LARGE_SIZE)
+        
+    fig_menu_dist2.tight_layout()
+    
+    save_fig(dir_nm_save_fig, fig_menu_dist2, title='메뉴 가격 분포2',
+             close_fig=False)
+    
+    #%% Plot - School spatial distribution
+    fig_sch_dist, ax_sch_dist = plt.subplots(1, 1, figsize=(11, 8))
+    
+    gdf_emd_jj.plot(column='mean_rest',alpha=0.5, edgecolor='k', linewidth=2,
+                    ax=ax_sch_dist, cmap='RdBu', legend=True)
+    ax_sch_dist.axis(False)
     
     #%% Plot - Mapping number of all restaurants considering child behavior
     fig_num_rest_all, ax_num_rest_all = \
         plt.subplots(1, 1, figsize=(12, 12))
         
-    c_cmap = 'Blues'
+    c_cmap = 'RdYlBu'
     vmin_tot_r = gdf_emd_jj.mean_rest.min()
     vmax_tot_r = gdf_emd_jj.mean_rest.max();    
     c_norm_tot_r = plt.Normalize(vmin=vmin_tot_r, vmax=vmax_tot_r)
@@ -658,12 +810,12 @@ if __name__ == '__main__':
     ax_num_rest_all_cbar = \
         fig_num_rest_all.colorbar(c_cbar_tot_r, ax=ax_num_rest_all,
                                       fraction=0.018)
-    ax_num_rest_all_cbar.set_label(label='접근가능 음식점 지수',
+    ax_num_rest_all_cbar.set_label(label='접근성 지수',
                                        size=25 ,weight='bold')
     
     for idx, r in gdf_emd_jj.iterrows():
-        if (idx in gdf_emd_jj.sum_rest.nlargest(5).index) or \
-            (idx in gdf_emd_jj.sum_rest.nsmallest(5).index):
+        if (idx in gdf_emd_jj.mean_rest.nlargest(5).index) or \
+            (idx in gdf_emd_jj.mean_rest.nsmallest(5).index):
             x, y = r.geometry.centroid.x, r.geometry.centroid.y
             plt.text(x, y, r.ADM_DR_NM, fontsize=10)
         
@@ -675,6 +827,9 @@ if __name__ == '__main__':
     fig_num_rest_frchs, ax_num_rest_frchs = \
         plt.subplots(1, 1, figsize=(12, 12))  
         
+    LegendElement = [mpatches.Patch(facecolor='w', hatch='//////',
+                                    edgecolor='k', label='학교가 없는 지역')] 
+        
     vmin_frchs_r = gdf_emd_jj_frchs.mean_rest.min()
     vmax_frchs_r = gdf_emd_jj_frchs.mean_rest.max();    
     c_norm_frchs_r = plt.Normalize(vmin=vmin_frchs_r, vmax=vmax_frchs_r)
@@ -682,23 +837,29 @@ if __name__ == '__main__':
     
     gdf_emd_jj_frchs.plot(ax=ax_num_rest_frchs, alpha=0.5,
                           edgecolor='k', linewidth=2, column='mean_rest',
-                          cmap=c_cmap, legend=False, norm=c_norm_frchs_r)    
+                          cmap=c_cmap, legend=False, norm=c_norm_frchs_r) 
+    gdf_emd_jj_frchs[gdf_emd_jj_frchs['mean_rest'].isnull()]\
+        .plot(ax=ax_num_rest_frchs, alpha=0.5,
+              edgecolor='k', linewidth=2,
+              color='lightgrey', legend=False, norm=c_norm_tot_r,
+              hatch='//', label='학교')
     
     ax_num_rest_frchs.axis('off')
     ax_num_rest_frchs.set_title(
         '활동반경을 고려한 접근가능 가맹음식점 지수 분포')
+    ax_num_rest_frchs.legend(handles=LegendElement, loc='lower left')
     
     ax_num_rest_frchs_cbar = \
         fig_num_rest_frchs.colorbar(c_cbar_frchs_r, ax=ax_num_rest_frchs,
                                     fraction=0.018)
-    ax_num_rest_frchs_cbar.set_label(label='접근가능 음식점 지수',
+    ax_num_rest_frchs_cbar.set_label(label='접근성 지수',
                                      size=25 ,weight='bold')
     
-    # for idx, r in gdf_emd_jj_frchs.iterrows():
-    #     if (idx in gdf_emd_jj_frchs.sum_rest.nlargest(5).index) or \
-    #         (idx in gdf_emd_jj_frchs.sum_rest.nsmallest(5).index):
-    #         x, y = r.geometry.centroid.x, r.geometry.centroid.y
-    #         plt.text(x, y, r.ADM_DR_NM, fontsize=10)
+    for idx, r in gdf_emd_jj_frchs.iterrows():
+        if (idx in gdf_emd_jj_frchs.mean_rest.nlargest(0).index) or \
+            (idx in gdf_emd_jj_frchs.mean_rest.dropna().nsmallest(11).index):
+            x, y = r.geometry.centroid.x, r.geometry.centroid.y
+            plt.text(x, y, r.ADM_DR_NM, fontsize=10)
         
     save_fig(dir_nm_save_fig, fig_num_rest_frchs, 
              '활동반경을 고려한 접근가능 가맹음식점 지수 분포(지역이름 무)',
@@ -707,6 +868,9 @@ if __name__ == '__main__':
     #%% Plot - Mapping number of restaurants (total & franchise mix)
     fig_num_rest_mix, ax_num_rest_mix = \
         plt.subplots(1, 2, figsize=(18, 18))  
+        
+    LegendElement = [mpatches.Patch(facecolor='w', hatch='//////',
+                                    edgecolor='k', label='학교가 없는 지역')] 
     
     gdf_emd_jj_frchs.plot(ax=ax_num_rest_mix[0], alpha=0.5,
                           edgecolor='k', linewidth=2, column='mean_rest',
@@ -715,15 +879,14 @@ if __name__ == '__main__':
     .plot(ax=ax_num_rest_mix[0], alpha=0.5,
                           edgecolor='k', linewidth=2,
                           color='lightgrey', legend=False, norm=c_norm_tot_r,
-                          hatch='//')    
-    
+                          hatch='//', label='학교가 없는 지역')    
     ax_num_rest_mix[0].axis('off')
     ax_num_rest_mix[0].set_title('가맹음식점 기준')
+    ax_num_rest_mix[0].legend(handles=LegendElement, loc='lower left')
     
     gdf_emd_jj.plot(ax=ax_num_rest_mix[1], alpha=0.5,
                     edgecolor='k', linewidth=2, column='mean_rest',
                     cmap=c_cmap, legend=False, norm=c_norm_tot_r)    
-    
     ax_num_rest_mix[1].axis('off')
     ax_num_rest_mix[1].set_title('전체음식점 기준')  
     gdf_emd_jj[gdf_emd_jj['mean_rest'].isnull()]\
@@ -731,22 +894,86 @@ if __name__ == '__main__':
           edgecolor='k', linewidth=2,
           color='lightgrey', legend=False, norm=c_norm_tot_r,
           hatch='//')
+    ax_num_rest_mix[1].legend(handles=LegendElement, loc='lower left')
     
     ax_num_rest_mix_cbar = \
         fig_num_rest_mix.colorbar(c_cbar_tot_r, ax=ax_num_rest_mix[1],
                                   fraction=0.05)
-    ax_num_rest_mix_cbar.set_label(label='복지카드 사용 편의 지수',
+    ax_num_rest_mix_cbar.set_label(label='접근성 지수',
                                      size=25 ,weight='bold')
         
     save_fig(dir_nm_save_fig, fig_num_rest_mix, 
              '활동반경을 고려한 접근가능 가맹음식점 지수 분포(가맹, 전체)',
-             close_fig=False)         
+             close_fig=False)      
     
+    #%% Plot - Bar chart of the number of restaurants (total & franchise mix)
+    fig_num_rest_bar, ax_num_rest_bar = plt.subplots(1, 1, figsize=(12, 8))    
+       
+    ax_num_rest_bar.barh(y=np.arange(len(gdf_emd_jj.mean_rest.dropna())),
+                         width=gdf_emd_jj.mean_rest.dropna(),
+                         label='전체 음식점')
     
+    ax_num_rest_bar.barh(y=np.arange(len(gdf_emd_jj_frchs.mean_rest.dropna())),
+                         width=gdf_emd_jj_frchs.mean_rest.dropna(),
+                         label='가맹 음식점')
+    
+    ax_num_rest_bar.set_ylabel('지역명', fontsize=LARGE_SIZE)
+    ax_num_rest_bar.set_xlabel('접근성 지수', fontsize=LARGE_SIZE)
+    ax_num_rest_bar.set_yticks(np.arange(len(gdf_emd_jj.mean_rest.dropna())))
+    ax_num_rest_bar.set_yticklabels(
+        gdf_emd_jj_frchs.dropna(subset=['mean_rest']).ADM_DR_NM,
+        fontsize=SMALL_SIZE*0.9)
+    ax_num_rest_bar.legend()
+    
+    save_fig(dir_nm_save_fig, fig_num_rest_bar, 
+             '행동패턴을 고려한 접근 편의성 지수 bar 차')
+
+    #%% Total differenct check when applying new policy
+    s = gdf_emd_jj.mean_rest.sum()/gdf_emd_jj_frchs.mean_rest.sum()
+    avg = gdf_emd_jj.mean_rest.mean()/gdf_emd_jj_frchs.mean_rest.mean()
+    med = gdf_emd_jj.mean_rest.median()/gdf_emd_jj_frchs.mean_rest.median()
+    
+    #%% Difference check when applyging new policy by baseline
+    gdf_before_low_med = \
+        gdf_emd_jj_frchs[gdf_emd_jj_frchs.mean_rest <=
+                         gdf_emd_jj_frchs.mean_rest.median()]
         
+    gdf_before_up_med = \
+        gdf_emd_jj_frchs[gdf_emd_jj_frchs.mean_rest >
+                         gdf_emd_jj_frchs.mean_rest.median()]
         
+    gdf_after_low_med = gdf_emd_jj.loc[gdf_before_low_med.index, :]
+    gdf_after_up_med = gdf_emd_jj.loc[gdf_before_up_med.index, :]
     
+    chg_mean = (gdf_after_low_med.mean_rest - gdf_before_low_med.mean_rest)/\
+        gdf_before_low_med.mean_rest
+    chg_mean = chg_mean.replace([np.inf], np.nan).dropna().mean()
     
+    chg_low_med = \
+        (gdf_after_low_med.mean_rest - gdf_before_low_med.mean_rest)/\
+            gdf_before_low_med.mean_rest
+    chg_up_med = \
+       (gdf_after_up_med.mean_rest - gdf_before_up_med.mean_rest)/\
+           gdf_after_up_med.mean_rest
+           
+    print(chg_low_med.replace([np.inf], np.nan).dropna().mean(),
+          chg_up_med.mean())
+    plt.boxplot([chg_low_med, chg_up_med])
+    
+    #%% 
+    os.chdir('data')
+    
+    add_info = pd.read_csv('법정동_정보_cp.csv', encoding='euc-kr', index_col=0)
+    
+    os.chdir(dir_org)
+    
+    gdf_more_info = pd.merge(gdf_emd_jj, add_info,
+                             left_on='ADM_DR_NM', right_on='법정동이름',
+                             how='outer')
+    
+    import pickle
+    with open ('gdf_more_info', 'wb') as f:
+        pickle.dump(gdf_more_info, f)
     
     
     
