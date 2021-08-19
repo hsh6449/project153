@@ -70,7 +70,7 @@ def get_all_attr(price, price2=None, min_th_dist=1.1, mode='policy'):
     
 #%% Custom classes
 class GdfCompare:
-    def __init__(self, gdf1, gdf2, min_th_dist=100):
+    def __init__(self, gdf1, gdf2, min_th_dist=1.1):
         self.gdf_before = gdf1
         self.gdf_after = gdf2
         self.alternative = 'less'
@@ -79,6 +79,7 @@ class GdfCompare:
         self.min_thld_distance = min_th_dist
         
     def run_stats_diff(self):
+        import math
         from scipy.stats import shapiro, ttest_rel
         
         sw_jj_frchs = shapiro(self.gdf_before.mean_rest)
@@ -90,9 +91,18 @@ class GdfCompare:
                                alternative=self.alternative)
             # H0 : Mean values are identical
             # H1 : Mean of a is less than the mean of b
-            print('Paired T-Test was done')
-            self.t_test = True
-            self.t_test_pval = t_test.pvalue
+            if math.isnan(t_test.pvalue):
+                wrst = wilcoxon(self.gdf_before.mean_rest, 
+                                self.gdf_after.mean_rest,
+                                alternative=self.alternative,
+                                zero_method='zsplit')
+                self.wrst = True
+                self.wrst_s = wrst.statistic
+                self.wrst_pval = wrst.pvalue
+            else:
+                self.t_test = True
+                self.t_test_s = t_test.statistic
+                self.t_test_pval = t_test.pvalue
         else:
             wrst = wilcoxon(self.gdf_before.mean_rest, 
                             self.gdf_after.mean_rest,
@@ -100,8 +110,9 @@ class GdfCompare:
                             zero_method='wilcox')
             # H0 : Two related paired samples come from the same distribution
             # H1 : Median of a is less than the median of b
-            print('Wilcoxon Signed Rank Test was done')
+            # print('Wilcoxon Signed Rank Test was done')
             self.wrst = True
+            self.wrst_s = wrst.statistic
             self.wrst_pval = wrst.pvalue
             
             
@@ -171,31 +182,47 @@ class GdfCompare:
             
         
     def plot_compare(self):
+        import matplotlib.patches as mpatches
+            
         fig, ax = plt.subplots(1, 2, figsize=(18, 9))
         
+        LegendElement = [mpatches.Patch(facecolor='r', 
+                                edgecolor='k', label='Hot Spot'),
+                 mpatches.Patch(facecolor='lightgrey', 
+                                edgecolor='k', label='Non Significant'),
+                 mpatches.Patch(facecolor='blue', 
+                                edgecolor='k', label='Cold Spot')] 
+        
         sig_gdf_before = self.gdf_before.lg_p_sim < 0.05
-        ns_jj_frchs = self.gdf_before[sig_gdf_before==False].plot(
-            ax=ax[0], color='lightgrey', edgecolor='k', linewidth=0.1)
         hh_jj_frchs = self.gdf_before[(sig_gdf_before==True) & 
                                     (self.gdf_before.lg_Zs > 0)].plot(
-            ax=ax[0], color='red', edgecolor='k', linewidth=0.1)
-        ll_jj_frchs = gdf_emd_jj_frchs[(sig_gdf_before==True) & 
+            ax=ax[0], color='red', edgecolor='k', linewidth=0.1, 
+            legend=True, categorical=True)
+        ns_jj_frchs = self.gdf_before[sig_gdf_before==False].plot(
+            ax=ax[0], color='lightgrey', edgecolor='k', linewidth=0.1,
+            label='Non Significant')
+        ll_jj_frchs = self.gdf_before[(sig_gdf_before==True) & 
                                        (self.gdf_before.lg_Zs < 0)].plot(
-           ax=ax[0], color='blue', edgecolor='k', linewidth=0.1)                                        
+           ax=ax[0], color='blue', edgecolor='k', linewidth=0.1, 
+           label='Cold Spot')                                        
         ax[0].axis(False)
-        
-        # self.gdf_before[self.gdf_before.hotspot_class==]
+        ax[0].legend(handles=LegendElement, loc='upper right')        
         
         sig_gdf_after = self.gdf_after.lg_p_sim < 0.05
-        ns_jj = self.gdf_after[sig_jj==False].plot(
-            ax=ax[1], color='lightgrey', edgecolor='k', linewidth=0.1)
         hh_jj = self.gdf_after[(sig_jj==True) & 
                                (self.gdf_after.lg_Zs > 0)].plot(
-            ax=ax[1], color='red', edgecolor='k', linewidth=0.1)
+            ax=ax[1], color='red', edgecolor='k', linewidth=0.1,
+            label='Hot Spot')
+        ns_jj = self.gdf_after[sig_jj==False].plot(
+            ax=ax[1], color='lightgrey', edgecolor='k', linewidth=0.1,
+            label='Non Significant')
         ll_jj = self.gdf_after[(sig_jj==True) & 
                                (self.gdf_after.lg_Zs < 0)].plot(
-            ax=ax[1], color='blue', edgecolor='k', linewidth=0.1)
+            ax=ax[1], color='blue', edgecolor='k', linewidth=0.1,
+            label='Cold Spot')
         ax[1].axis(False)
+        ax[1].legend()
+        ax[1].legend(handles=LegendElement, loc='upper right')
         
         return fig
     
@@ -215,6 +242,7 @@ if __name__ == '__main__':
     import re
     import libpysal
     import pickle
+    import matplotlib.patches as mpatches
     
     from tqdm import tqdm
     from matplotlib import pyplot as plt
@@ -270,6 +298,9 @@ if __name__ == '__main__':
 
     #%% Load JeonJu emd geodataframe which is merged with restaurants
     gdf_emd_jj_frchs, gdf_emd_jj = load_map_rest_join()
+    
+    # gdf_emd_jj_frchs = gdf_emd_jj_frchs.dropna(subset=['mean_rest'])
+    # gdf_emd_jj = gdf_emd_jj.dropna(subset=['mean_rest'])
 
     #%% Getis Ord Local
     cent_jj = gdf_emd_jj.geometry.centroid
@@ -290,12 +321,20 @@ if __name__ == '__main__':
     gdf_emd_jj['lg_Zs'] = lg_jj.Zs
 
     #%% Plot - 
+    LegendElement = [mpatches.Patch(facecolor='r', 
+                                    edgecolor='k', label='Hot Spot'),
+                     mpatches.Patch(facecolor='lightgrey', 
+                                    edgecolor='k', label='Non Significant'),
+                     mpatches.Patch(facecolor='blue', 
+                                    edgecolor='k', label='Cold Spot')] 
+    
     fig, ax = plt.subplots(1, 2, figsize=(18, 9))
     
     sig_jj_frchs = gdf_emd_jj_frchs.lg_p_sim < 0.05
     
     ns_jj_frchs = gdf_emd_jj_frchs[sig_jj_frchs==False].plot(
-        ax=ax[0], color='lightgrey', edgecolor='k', linewidth=0.1)
+        ax=ax[0], color='lightgrey', edgecolor='k', linewidth=0.1,
+        label='Non Significant', legend=True)
     
     hh_jj_frchs = gdf_emd_jj_frchs[(sig_jj_frchs==True) & 
                                 (gdf_emd_jj_frchs.lg_Zs > 0)].plot(
@@ -306,6 +345,7 @@ if __name__ == '__main__':
         ax=ax[0], color='blue', edgecolor='k', linewidth=0.1)
                                     
     ax[0].axis(False)
+    ax[0].legend(handles=LegendElement, loc='upper right')
     
     sig_jj = gdf_emd_jj.lg_p_sim < 0.05
     
@@ -321,6 +361,7 @@ if __name__ == '__main__':
         ax=ax[1], color='blue', edgecolor='k', linewidth=0.1)
                                     
     ax[1].axis(False)
+    ax[1].legend(handles=LegendElement, loc='upper right')
     
     # ========================================================================    
     #%% Paired T-test of Wilcoxon signed rank test for mean restaurants col
@@ -355,39 +396,84 @@ if __name__ == '__main__':
     baseline.run_local_g()
     baseline.run_stats_diff()
     baseline.run_global_moran()
-    baseline.plot_compare()
+    baseline_fig = baseline.plot_compare()
     
-    print(baseline.glo_m_before, baseline.glo_m_after)
+    save_fig(dir_nm_save_fig, baseline_fig, title='Baseline Hotspot Analysis')
+    
+    
+    #%% Difference check when applyging new policy by baseline
+    gdf_before_low_med = \
+        baseline.gdf_before[baseline.gdf_before.mean_rest < 
+                            baseline.gdf_before.mean_rest.median()]
 
-    #%% price increasing test under condition prior to policy application
+    #%% price increasing test under condition prior to new policy
     pri_inc_wo_plcy = []
     for price in tqdm(np.arange(6000, 10500, 500),
-                      desc='price variation test'):
+                      desc='Price increase test prior to the new policy'):
         pri_inc_wo_plcy.append(
             get_all_attr(6000, price, mode='before')
             )
-        
-    pvals_before = [x.t_test_pval for x in pri_inc_wo_plcy]
     
-    mean_rests_before = [x.gdf_after.sum_rest.sum() for x in pri_inc_wo_plcy]
+    #%% Get results from price increasing test prior to the new policy
+    df_pri_inc_pr = pd.DataFrame(index=np.arange(6000, 10500, 500))
+    df_pri_inc_pr['stats_diff'] = \
+        ['t' if x.t_test else 'w' for x in pri_inc_wo_plcy]
+    df_pri_inc_pr['statistic'] = \
+        [x.t_test_s if x.t_test else x.wrst_s for x in pri_inc_wo_plcy]
+    df_pri_inc_pr['pvals'] = \
+        [x.t_test_pval if x.t_test else x.wrst_pval for x in pri_inc_wo_plcy]
+    df_pri_inc_pr['glo_m'] = \
+        [x.glo_m_after[1] for x in pri_inc_wo_plcy]
+    df_pri_inc_pr['sum_mean_rests_wo_p'] = \
+        [x.gdf_after.mean_rest.sum() for x in pri_inc_wo_plcy]
+    df_pri_inc_pr['avg_mean_rests_wo_p'] = \
+        [x.gdf_after.mean_rest.dropna().mean() for x in pri_inc_wo_plcy]
+    df_pri_inc_pr['med_mean_rests_wo_p'] = \
+        [x.gdf_after.mean_rest.dropna().median() for x in pri_inc_wo_plcy]
     
-    #%% price increasing test under condition posterior policy application
+    #%% price increasing test under condition posterior to the new policcy
     pri_inc_w_plcy = []
     for price in tqdm(np.arange(6000, 10500, 500),
-                      desc='price variation test'):
+                      desc='Price increase test posterior to the new policy'):
         pri_inc_w_plcy.append(
-            get_all_attr(6000, price, mode='before')
+            get_all_attr(6000, price, mode='after')
             )
         
-    pvals_after = [x.t_test_pval for x in pri_inc_w_plcy]
-    
-    mean_rests_after = [x.gdf_after.sum_rest.sum() for x in pri_inc_w_plcy]
+    #%% Get results from price increasing test posterior to the new policy
+    df_pri_inc_po = pd.DataFrame(index=np.arange(6000, 10500, 500))
+    df_pri_inc_po['stats_diff'] = \
+        ['t' if x.t_test else 'w' for x in pri_inc_w_plcy]
+    df_pri_inc_po['statistic'] = \
+        [x.t_test_s if x.t_test else x.wrst_s for x in pri_inc_w_plcy]
+    df_pri_inc_po['pvals'] = \
+        [x.t_test_pval if x.t_test else x.wrst_pval for x in pri_inc_w_plcy]
+    df_pri_inc_po['glo_m'] = \
+        [x.glo_m_after[1] for x in pri_inc_w_plcy]
+    df_pri_inc_po['sum_mean_rests_w_p'] = \
+        [x.gdf_after.mean_rest.sum() for x in pri_inc_w_plcy]
+    df_pri_inc_po['avg_mean_rests_w_p'] = \
+        [x.gdf_after.mean_rest.dropna().mean() for x in pri_inc_w_plcy]
+    df_pri_inc_po['med_mean_rests_w_p'] = \
+        [x.gdf_after.mean_rest.dropna().median() for x in pri_inc_w_plcy]
         
-    #%%
-    test = get_all_attr(6000, 6200, mode='after')
-    a = pd.DataFrame(data={'before':test.gdf_before.mean_rest,
-                           'after':test.gdf_after.mean_rest})
-    print(test.t_test_pval, test.wrst)
-
+    #%% Plot - P values based on price increasing
+    fig_pri_inc_pvals, ax_pri_inc_pvals = plt.subplots(1, 1, figsize=(8, 6))
+    
+    ax_pri_inc_pvals.plot(df_pri_inc_pr.index, df_pri_inc_pr.pvals, 'o-',
+                          label='가맹점 기반', markersize=8)
+    ax_pri_inc_pvals.plot(df_pri_inc_po.index, df_pri_inc_po.pvals, 's-',
+                          label='모든 음식점 기반', markersize=8)
+    ax_pri_inc_pvals.plot(df_pri_inc_po.index[2:], df_pri_inc_po.pvals[2:], 
+                          's', label='통계적으로 유의', markersize=8)
+    ax_pri_inc_pvals.axhline(0.05, linestyle='--', color='r', linewidth=1.5)
+    ax_pri_inc_pvals.text(6000, 0.055, '0.05', fontsize=12)
+    ax_pri_inc_pvals.legend()
+    
+    ax_pri_inc_pvals.set_xlabel('지원 가격(원)')
+    ax_pri_inc_pvals.set_ylabel('P-value')
+    
+    save_fig(dir_nm_save_fig, fig_pri_inc_pvals, title='정책별 pvalues',
+             close_fig=False)
+    
     
     
